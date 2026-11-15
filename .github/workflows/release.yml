@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,39 +28,48 @@ jobs:
 
       - name: Prepare build files
         run: |
-          # 解码base64编码的keystore文件
-          echo "${{ secrets.KEY_BASE64 }}" | base64 -d > app/app.key
-          
-          # 写入签名配置到local.properties
-          echo "${{ secrets.SIGNING_CONFIG }}" > local.properties
-          
-          # 写入Google Services配置
-          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+          cat << 'EOF' > app/google-services.json
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "placeholder-project",
+              "storage_bucket": "placeholder-project.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": { "package_name": "me.rerere.rikkahub" }
+                },
+                "api_key": [{ "current_key": "AIzaSyPlaceholderKey000000000000000000" }]
+              },
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000001",
+                  "android_client_info": { "package_name": "me.rerere.rikkahub.liquidglass" }
+                },
+                "api_key": [{ "current_key": "AIzaSyPlaceholderKey000000000000000000" }]
+              },
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000002",
+                  "android_client_info": { "package_name": "com.orangechat.app.liquidglass" }
+                },
+                "api_key": [{ "current_key": "AIzaSyPlaceholderKey000000000000000000" }]
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
 
-      - name: Gradle Build
+      - name: Gradle Build Debug
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease
-
-      - name: Extract version
-        id: version
-        run: |
-          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          ./gradlew assembleDebug
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: artifacts
-          path: app/build/outputs/apk/release/*.apk
-
-      - name: Create GitHub Release
-        if: success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ steps.version.outputs.version }}" \
-            --title "Release ${{ steps.version.outputs.version }}" \
-            --generate-notes \
-            app/build/outputs/apk/release/*.apk
+          name: orangechat-liquidglass-debug
+          path: app/build/outputs/apk/debug/*.apk
