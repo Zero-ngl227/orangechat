@@ -412,7 +412,7 @@ class RouteActivity : ComponentActivity() {
                 LocalTTSState provides tts,
                 LocalASRState provides asr,
             ) {
-                Toaster(
+                                Toaster(
                     state = toastState,
                     darkTheme = LocalDarkMode.current,
                     richColors = true,
@@ -434,6 +434,7 @@ class RouteActivity : ComponentActivity() {
                             }
                         }
                 ) {
+                    RibbonBackdrop()
                     SettingsBackground {
                         NavDisplay(
                             backStack = backStack,
