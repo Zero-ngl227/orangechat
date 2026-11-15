@@ -175,6 +175,7 @@ import me.rerere.rikkahub.service.VoiceCallService
 import me.rerere.rikkahub.ui.pages.webview.WebViewPage
 import me.rerere.rikkahub.ui.theme.LocalDarkMode
 import me.rerere.rikkahub.ui.theme.RikkahubTheme
+import me.rerere.rikkahub.ui.theme.RibbonBackdrop
 import me.rerere.rikkahub.utils.CrashHandler
 import me.rerere.rikkahub.service.ChatService
 import me.rerere.rikkahub.service.KeepAliveService
