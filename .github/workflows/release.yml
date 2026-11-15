@@ -39,7 +39,7 @@ jobs:
               {
                 "client_info": {
                   "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
-                  "android_client_info": { "package_name": "me.rerere.rikkahub" }
+                "android_client_info": { "package_name": "me.rerere.rikkahub" }
                 },
                 "api_key": [{ "current_key": "AIzaSyPlaceholderKey000000000000000000" }]
               },
@@ -65,7 +65,7 @@ jobs:
       - name: Gradle Build Debug
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug -x :web:buildWebUi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
