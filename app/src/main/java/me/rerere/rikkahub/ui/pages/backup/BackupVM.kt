@@ -1,4 +1,4 @@
-﻿/*
+/*
  * 橘瓣 OrangeChat
  * 衍生自 RikkaHub (https://github.com/rikkahub/rikkahub)，原作者 RE
  * 本项目基于 GNU AGPL v3 开源，详见根目录 LICENSE 文件
@@ -9,10 +9,12 @@ package me.rerere.rikkahub.ui.pages.backup
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.repository.ConversationRepository
@@ -80,7 +82,9 @@ class BackupVM(
     }
 
     suspend fun restore(item: WebDavBackupItem) {
-        webDavSync.restore(config = settings.value.webDavConfig, item = item)
+        withContext(NonCancellable) {
+            webDavSync.restore(config = settings.value.webDavConfig, item = item)
+        }
     }
 
     suspend fun deleteWebDavBackupFile(item: WebDavBackupItem) {
@@ -94,57 +98,62 @@ class BackupVM(
     }
 
     suspend fun restoreFromLocalFile(file: File) {
-        webDavSync.restoreFromLocalFile(file, settings.value.webDavConfig)
+        // 使用 NonCancellable 防止恢复设置触发主题重组时中断后续的数据库（聊天记录）恢复
+        withContext(NonCancellable) {
+            webDavSync.restoreFromLocalFile(file, settings.value.webDavConfig)
+        }
     }
 
     suspend fun restoreFromChatBox(file: File): ChatboxRestoreResult {
-        val payload = ChatboxImporter.import(
-            file = file,
-            assistantId = settings.value.assistantId,
-            providers = settings.value.providers,
-        )
-        val targetAssistantId = settings.value.assistantId
-        val mergedProviders = payload.providers + settings.value.providers
-        val shouldAllowConversationSystemPrompt = payload.conversations.conversations.any {
-            !it.customSystemPrompt.isNullOrBlank()
-        }
-        settingsStore.update(
-            settings.value.copy(
-                providers = mergedProviders,
-                assistants = settings.value.assistants.map { assistant ->
-                    if (shouldAllowConversationSystemPrompt && assistant.id == targetAssistantId) {
-                        assistant.copy(allowConversationSystemPrompt = true)
-                    } else {
-                        assistant
-                    }
-                }
+        return withContext(NonCancellable) {
+            val payload = ChatboxImporter.import(
+                file = file,
+                assistantId = settings.value.assistantId,
+                providers = settings.value.providers,
             )
-        )
-
-        var importedConversations = 0
-        var skippedExistingConversations = 0
-        payload.conversations.conversations.forEach { conversation ->
-            if (conversationRepository.existsConversationById(conversation.id)) {
-                skippedExistingConversations++
-            } else {
-                conversationRepository.insertConversation(conversation)
-                importedConversations++
+            val targetAssistantId = settings.value.assistantId
+            val mergedProviders = payload.providers + settings.value.providers
+            val shouldAllowConversationSystemPrompt = payload.conversations.conversations.any {
+                !it.customSystemPrompt.isNullOrBlank()
             }
-        }
+            settingsStore.update(
+                settings.value.copy(
+                    providers = mergedProviders,
+                    assistants = settings.value.assistants.map { assistant ->
+                        if (shouldAllowConversationSystemPrompt && assistant.id == targetAssistantId) {
+                            assistant.copy(allowConversationSystemPrompt = true)
+                        } else {
+                            assistant
+                        }
+                    }
+                )
+            )
 
-        Log.i(
-            TAG,
-            "restoreFromChatBox: import ${payload.providers.size} providers, " +
-                "$importedConversations conversations, skip $skippedExistingConversations existing, " +
-                "drop ${payload.conversations.skippedImageParts} images"
-        )
-        return ChatboxRestoreResult(
-            importedProviders = payload.providers.size,
-            importedConversations = importedConversations,
-            skippedExistingConversations = skippedExistingConversations,
-            skippedImageParts = payload.conversations.skippedImageParts,
-            skippedEmptyMessages = payload.conversations.skippedEmptyMessages,
-        )
+            var importedConversations = 0
+            var skippedExistingConversations = 0
+            payload.conversations.conversations.forEach { conversation ->
+                if (conversationRepository.existsConversationById(conversation.id)) {
+                    skippedExistingConversations++
+                } else {
+                    conversationRepository.insertConversation(conversation)
+                    importedConversations++
+                }
+            }
+
+            Log.i(
+                TAG,
+                "restoreFromChatBox: import ${payload.providers.size} providers, " +
+                    "$importedConversations conversations, skip $skippedExistingConversations existing, " +
+                    "drop ${payload.conversations.skippedImageParts} images"
+            )
+            ChatboxRestoreResult(
+                importedProviders = payload.providers.size,
+                importedConversations = importedConversations,
+                skippedExistingConversations = skippedExistingConversations,
+                skippedImageParts = payload.conversations.skippedImageParts,
+                skippedEmptyMessages = payload.conversations.skippedEmptyMessages,
+            )
+        }
     }
 
     fun restoreFromCherryStudio(file: File) {
@@ -191,7 +200,9 @@ class BackupVM(
     }
 
     suspend fun restoreFromS3(item: S3BackupItem) {
-        s3Sync.restoreFromS3(config = settings.value.s3Config, item = item)
+        withContext(NonCancellable) {
+            s3Sync.restoreFromS3(config = settings.value.s3Config, item = item)
+        }
     }
 
     suspend fun deleteS3BackupFile(item: S3BackupItem) {
