@@ -1,4 +1,4 @@
-﻿/*
+/*
  * 橘瓣 OrangeChat
  * 衍生自 RikkaHub (https://github.com/rikkahub/rikkahub)，原作者 RE
  * 本项目基于 GNU AGPL v3 开源，详见根目录 LICENSE 文件
@@ -23,14 +23,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewModelScope
 import com.dokar.sonner.ToastType
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.components.ui.StickyHeader
@@ -48,8 +50,7 @@ fun ImportExportTab(
     onShowRestartDialog: () -> Unit
 ) {
     val toaster = LocalToaster.current
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val appContext = LocalContext.current.applicationContext
     var isExporting by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
 
@@ -61,30 +62,26 @@ fun ImportExportTab(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         uri?.let { targetUri ->
-            scope.launch {
+            vm.viewModelScope.launch {
                 isExporting = true
                 runCatching {
-                    // 导出文件
-                    val exportFile = vm.exportToFile()
-
-                    // 复制到用户选择的位置
-                    context.contentResolver.openOutputStream(targetUri)?.use { outputStream ->
-                        FileInputStream(exportFile).use { inputStream ->
-                            inputStream.copyTo(outputStream)
+                    withContext(NonCancellable) {
+                        val exportFile = vm.exportToFile()
+                        appContext.contentResolver.openOutputStream(targetUri)?.use { outputStream ->
+                            FileInputStream(exportFile).use { inputStream ->
+                                inputStream.copyTo(outputStream)
+                            }
                         }
+                        exportFile.delete()
                     }
-
-                    // 清理临时文件
-                    exportFile.delete()
-
                     toaster.show(
-                        context.getString(R.string.backup_page_backup_success),
+                        appContext.getString(R.string.backup_page_backup_success),
                         type = ToastType.Success
                     )
                 }.onFailure { e ->
                     e.printStackTrace()
                     toaster.show(
-                        context.getString(R.string.backup_page_restore_failed, e.message ?: ""),
+                        appContext.getString(R.string.backup_page_restore_failed, e.message ?: ""),
                         type = ToastType.Error
                     )
                 }
@@ -93,79 +90,70 @@ fun ImportExportTab(
         }
     }
 
-    // 创建文件选择的launcher
+    // 创建文件选择的launcher（使用 vm.viewModelScope + NonCancellable 防止界面重组中断）
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { sourceUri ->
-            scope.launch {
+            val currentImportType = importType
+            vm.viewModelScope.launch {
                 isRestoring = true
                 runCatching {
-                    when (importType) {
-                        "local" -> {
-                            // 本地备份导入：处理zip文件
-                            val tempFile =
-                                File(context.cacheDir, "temp_restore_${System.currentTimeMillis()}.zip")
+                    withContext(NonCancellable) {
+                        when (currentImportType) {
+                            "local" -> {
+                                val tempFile =
+                                    File(appContext.cacheDir, "temp_restore_${System.currentTimeMillis()}.zip")
 
-                            context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
-                                FileOutputStream(tempFile).use { outputStream ->
-                                    inputStream.copyTo(outputStream)
+                                appContext.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                                    FileOutputStream(tempFile).use { outputStream ->
+                                        inputStream.copyTo(outputStream)
+                                    }
                                 }
+
+                                vm.restoreFromLocalFile(tempFile)
+                                tempFile.delete()
                             }
 
-                            // 从临时文件恢复
-                            vm.restoreFromLocalFile(tempFile)
+                            "chatbox" -> {
+                                val tempFile =
+                                    File(appContext.cacheDir, "temp_chatbox_${System.currentTimeMillis()}.json")
 
-                            // 清理临时文件
-                            tempFile.delete()
-                        }
-
-                        "chatbox" -> {
-                            // Chatbox导入：处理json文件
-                            val tempFile =
-                                File(context.cacheDir, "temp_chatbox_${System.currentTimeMillis()}.json")
-
-                            context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
-                                FileOutputStream(tempFile).use { outputStream ->
-                                    inputStream.copyTo(outputStream)
+                                appContext.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                                    FileOutputStream(tempFile).use { outputStream ->
+                                        inputStream.copyTo(outputStream)
+                                    }
                                 }
+
+                                vm.restoreFromChatBox(tempFile)
+                                tempFile.delete()
                             }
 
-                            // 从Chatbox文件恢复
-                            vm.restoreFromChatBox(tempFile)
+                            "cherry" -> {
+                                val tempFile =
+                                    File(appContext.cacheDir, "temp_cherry_${System.currentTimeMillis()}.zip")
 
-                            // 清理临时文件
-                            tempFile.delete()
-                        }
-
-                        "cherry" -> {
-                            // Cherry Studio导入：处理zip文件
-                            val tempFile =
-                                File(context.cacheDir, "temp_cherry_${System.currentTimeMillis()}.zip")
-
-                            context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
-                                FileOutputStream(tempFile).use { outputStream ->
-                                    inputStream.copyTo(outputStream)
+                                appContext.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                                    FileOutputStream(tempFile).use { outputStream ->
+                                        inputStream.copyTo(outputStream)
+                                    }
                                 }
+
+                                vm.restoreFromCherryStudio(tempFile)
+                                tempFile.delete()
                             }
-
-                            // 从Cherry Studio备份恢复
-                            vm.restoreFromCherryStudio(tempFile)
-
-                            // 清理临时文件
-                            tempFile.delete()
                         }
                     }
 
                     toaster.show(
-                        context.getString(R.string.backup_page_restore_success),
+                        appContext.getString(R.string.backup_page_restore_success),
                         type = ToastType.Success
                     )
                     onShowRestartDialog()
                 }.onFailure { e ->
                     e.printStackTrace()
                     toaster.show(
-                        context.getString(R.string.backup_page_restore_failed, e.message ?: ""),
+                        appContext.getString(R.string.backup_page_restore_failed, e.message ?: ""),
                         type = ToastType.Error
                     )
                 }
