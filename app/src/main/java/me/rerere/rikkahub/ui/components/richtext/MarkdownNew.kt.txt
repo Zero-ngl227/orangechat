@@ -831,8 +831,27 @@ private fun AnnotatedString.Builder.appendHtmlInlineNode(
     onClickCitation: (String) -> Unit,
 ) {
     when (node) {
-        is TextNode -> append(node.text())
-        is Element -> appendHtmlInlineElement(
+        private fun AnnotatedString.Builder.appendHtmlInlineNode(
+    node: Node,
+    colorScheme: androidx.compose.material3.ColorScheme,
+    inlineContents: MutableMap<String, InlineTextContent>,
+    density: Density,
+    style: TextStyle,
+    enableLatexRendering: Boolean,
+    onClickCitation: (String) -> Unit,
+) {
+    when (node) {
+        is TextNode -> {
+            val text = node.text()
+            var lastIndex = 0
+            QUOTE_HIGHLIGHT_REGEX.findAll(text).forEach { match ->
+                if (match.range.first > lastIndex) append(text.substring(lastIndex, match.range.first))
+                withStyle(SpanStyle(color = QuoteTextColor)) { append(match.value) }
+                lastIndex = match.range.last + 1
+            }
+            if (lastIndex < text.length) append(text.substring(lastIndex))
+        }
+        is Element -> appendHtmlInlineElement(  
             element = node,
             colorScheme = colorScheme,
             inlineContents = inlineContents,
@@ -886,10 +905,10 @@ private fun AnnotatedString.Builder.appendHtmlInlineElement(
         }
     }
 
-    when (element.tagName().lowercase()) {
-        "b", "strong" -> appendElementChildren(SpanStyle(fontWeight = FontWeight.SemiBold))
+        when (element.tagName().lowercase()) {
+        "b", "strong" -> appendElementChildren(SpanStyle(fontWeight = FontWeight.SemiBold, color = StrongTextColor))
 
-        "i", "em" -> appendElementChildren(SpanStyle(fontStyle = FontStyle.Italic))
+        "i", "em" -> appendElementChildren(SpanStyle(fontStyle = FontStyle.Italic, color = ItalicTextColor))
 
         "del", "s", "strike" -> appendElementChildren(SpanStyle(textDecoration = TextDecoration.LineThrough))
 
