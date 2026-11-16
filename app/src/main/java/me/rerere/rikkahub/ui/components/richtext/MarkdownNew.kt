@@ -1,4 +1,4 @@
-﻿/*
+$﻿/*
  * 橘瓣 OrangeChat
  * 衍生自 RikkaHub (https://github.com/rikkahub/rikkahub)，原作者 RE
  * 本项目基于 GNU AGPL v3 开源，详见根目录 LICENSE 文件
@@ -831,7 +831,22 @@ private fun AnnotatedString.Builder.appendHtmlInlineNode(
     onClickCitation: (String) -> Unit,
 ) {
     when (node) {
-        is TextNode -> append(node.text())
+        is TextNode -> {
+            val text = node.text()
+            var lastIndex = 0
+            QUOTE_HIGHLIGHT_REGEX.findAll(text).forEach { match ->
+                if (match.range.first > lastIndex) {
+                    append(text.substring(lastIndex, match.range.first))
+                }
+                withStyle(SpanStyle(color = QuoteTextColor)) {
+                    append(match.value)
+                }
+                lastIndex = match.range.last + 1
+            }
+            if (lastIndex < text.length) {
+                append(text.substring(lastIndex))
+            }
+        }
         is Element -> appendHtmlInlineElement(
             element = node,
             colorScheme = colorScheme,
@@ -887,10 +902,9 @@ private fun AnnotatedString.Builder.appendHtmlInlineElement(
     }
 
     when (element.tagName().lowercase()) {
-        "b", "strong" -> appendElementChildren(SpanStyle(fontWeight = FontWeight.SemiBold))
+        "b", "strong" -> appendElementChildren(SpanStyle(fontWeight = FontWeight.SemiBold, color = StrongTextColor))
 
-        "i", "em" -> appendElementChildren(SpanStyle(fontStyle = FontStyle.Italic))
-
+        "i", "em" -> appendElementChildren(SpanStyle(fontStyle = FontStyle.Italic, color = ItalicTextColor))
         "del", "s", "strike" -> appendElementChildren(SpanStyle(textDecoration = TextDecoration.LineThrough))
 
         "u" -> appendElementChildren(SpanStyle(textDecoration = TextDecoration.Underline))
