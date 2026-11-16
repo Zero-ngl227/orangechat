@@ -109,14 +109,11 @@ val THINKING_REGEX = Regex("<think>([\\s\\S]*?)(?:</think>|$)", RegexOption.DOT_
 private val CODE_BLOCK_REGEX = Regex("```[\\s\\S]*?```|`[^`\n]*`", RegexOption.DOT_MATCHES_ALL)
 private val BREAK_LINE_REGEX = Regex("(?i)<br\\s*/?>")
 private val BREAK_LINE_REGEX = Regex("(?i)<br\\s*/?>")
-// 匹配中文双引号 “...”、「...」 以及英文双引号 "..."
-private val QUOTE_REGEX = Regex("(“[^”]*”|「[^」]*」|\"[^\"\n]*\")")
-
-// 配色定义：引号用温柔棕褐/珊瑚色，斜体心声用藕荷紫，加粗用深梅子红
-private val QuoteHighlightColor = Color(0xFF9C5B49)   // 引号内对白颜色（可随你喜好微调）
-private val ItalicThoughtColor = Color(0xFF8C6278)    // *心声*斜体颜色
-private val StrongHighlightColor = Color(0xFF8F3D58)  // **加粗**重点颜色
-
+// 匹配中英文双引号与直角引号（包含模拟器常用的英文引号 "..."）
+internal val QUOTE_HIGHLIGHT_REGEX = Regex("(“[^”]*”|「[^」]*」|\"[^\"\n]*\")")
+internal val QuoteTextColor = Color(0xFF9A5B3E)   // 引号对白：暖焦糖棕（还原图3效果）
+internal val ItalicTextColor = Color(0xFFA34865)  // *斜体心声*：玫瑰豆沙粉（与主色调呼应）
+internal val StrongTextColor = Color(0xFF7D2E4D)  // **加粗文字**：深梅子酒红
 // 预处理markdown内容
 private fun preProcess(content: String): String {
     // 先找出所有代码块的位置
@@ -868,7 +865,7 @@ private fun AnnotatedString.Builder.appendMarkdownNodeContent(
             }
         }
 
-        node is LeafASTNode -> {
+                node is LeafASTNode -> {
             val text = node.getTextInNode(content).let {
                 if (trim) {
                     it.trim()
@@ -876,13 +873,23 @@ private fun AnnotatedString.Builder.appendMarkdownNodeContent(
                     it
                 }.replace(BREAK_LINE_REGEX, "\n")
             }
-            append(
-                text = text,
-            )
+            var lastIndex = 0
+            QUOTE_HIGHLIGHT_REGEX.findAll(text).forEach { match ->
+                if (match.range.first > lastIndex) {
+                    append(text.substring(lastIndex, match.range.first))
+                }
+                withStyle(SpanStyle(color = QuoteTextColor)) {
+                    append(match.value)
+                }
+                lastIndex = match.range.last + 1
+            }
+            if (lastIndex < text.length) {
+                append(text.substring(lastIndex))
+            }
         }
 
         node.type == MarkdownElementTypes.EMPH -> {
-            withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
+            withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = ItalicTextColor)) {
                 node.children.trim(MarkdownTokenTypes.EMPH, 1).fastForEach {
                     appendMarkdownNodeContent(
                         node = it,
@@ -899,7 +906,7 @@ private fun AnnotatedString.Builder.appendMarkdownNodeContent(
         }
 
         node.type == MarkdownElementTypes.STRONG -> {
-            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = StrongTextColor)) {
                 node.children.trim(MarkdownTokenTypes.EMPH, 2).fastForEach {
                     appendMarkdownNodeContent(
                         node = it,
