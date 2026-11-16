@@ -626,6 +626,204 @@ private fun HtmlTable(element: Element, onClickCitation: (String) -> Unit) {
 }
 
 @Composable
+private fun HtmlListItem(
+    item: Element,
+    bulletText: String,
+    onClickCitation: (String) -> Unit,
+    level: Int,
+) {
+    val isTaskItem = item.hasClass("task-list-item")
+    val checkboxInput = item.selectFirst("input[type=checkbox]")
+    val isChecked = checkboxInput?.hasAttr("checked") == true
+
+    HtmlStyledElement(element = item) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.padding(vertical = 2.dp),
+            ) {
+                if (isTaskItem && checkboxInput != null) {
+                    Surface(
+                        shape = RoundedCornerShape(2.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        modifier = Modifier.padding(end = 4.dp, top = 2.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .padding(2.dp)
+                                .size(LocalTextStyle.current.fontSize.toDp() * 0.8f),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isChecked) {
+                                Icon(
+                                    imageVector = HugeIcons.Tick01,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        text = bulletText,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.alignByBaseline(),
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    val directContentNodes = item.childNodes().filter { node ->
+                        !(node is Element &&
+                            (node.tagName().lowercase() in listOf("ul", "ol") ||
+                                (node.tagName().lowercase() == "input" && node.attr("type") == "checkbox")))
+                    }
+                    val groups = mutableListOf<MutableList<Node>>()
+                    directContentNodes.fastForEach { node ->
+                        if (node is Element && node.tagName().lowercase() == "p") {
+                            groups.add(mutableListOf(node))
+                        } else {
+                            val last = groups.lastOrNull()
+                            if (last != null && last.none {
+                                    it is Element && it.tagName().lowercase() == "p"
+                                }) {
+                                last.add(node)
+                            } else {
+                                groups.add(mutableListOf(node))
+                            }
+                        }
+                    }
+                    groups.fastForEach { group ->
+                        val first = group.firstOrNull()
+                        if (first is Element && first.tagName().lowercase() == "p") {
+                            HtmlParagraph(element = first, onClickCitation = onClickCitation)
+                        } else {
+                            HtmlInlineGroup(nodes = group, onClickCitation = onClickCitation)
+                        }
+                    }
+                }
+            }
+
+            item.children().fastForEach { child ->
+                val tag = child.tagName().lowercase()
+                if (tag == "ul" || tag == "ol") {
+                    HtmlList(
+                        element = child,
+                        ordered = tag == "ol",
+                        onClickCitation = onClickCitation,
+                        level = level + 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HtmlCodeBlock(element: Element) {
+    val codeElement = element.selectFirst("code")
+    val language = codeElement?.classNames()
+        ?.find { it.startsWith("language-") }
+        ?.removePrefix("language-")
+        ?: "plaintext"
+    val code = codeElement?.wholeText()?.trimEnd('\n') ?: element.wholeText().trimEnd('\n')
+
+    HighlightCodeBlock(
+        code = code,
+        language = language,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+        completeCodeBlock = true,
+    )
+}
+
+@Composable
+private fun HtmlBlockquote(element: Element, onClickCitation: (String) -> Unit) {
+    ProvideTextStyle(LocalTextStyle.current.copy(fontStyle = FontStyle.Italic)) {
+        val borderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+        val bgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+        Column(
+            modifier = Modifier
+                .drawWithContent {
+                    drawContent()
+                    drawRect(color = bgColor, size = size)
+                    drawRect(color = borderColor, size = Size(10f, size.height))
+                }
+                .padding(8.dp),
+        ) {
+            element.childNodes().fastForEach { HtmlBodyNode(it, onClickCitation) }
+        }
+    }
+}
+
+@Composable
+private fun HtmlMathBlock(formula: String) {
+    val enableLatexRendering = LocalSettings.current.displaySetting.enableLatexRendering
+    if (enableLatexRendering) {
+        MathBlock(
+            latex = formula,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+        )
+    } else {
+        Text(
+            text = formula,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun HtmlTable(element: Element, onClickCitation: (String) -> Unit) {
+    val headerElements = element.select("thead tr th")
+    val columnCount = headerElements.size.takeIf { it > 0 }
+        ?: element.select("tbody tr:first-child td").size
+    if (columnCount == 0) return
+
+    val headers = List(columnCount) { col ->
+        @Composable {
+            if (col < headerElements.size) {
+                HtmlStyledElement(element = headerElements[col]) {
+                    HtmlInlineGroup(
+                        nodes = headerElements[col].childNodes(),
+                        onClickCitation = onClickCitation,
+                    )
+                }
+            }
+        }
+    }
+
+    val bodyRows = element.select("tbody tr")
+    val rows = bodyRows.map { tr ->
+        val cellElements = tr.select("td")
+        List(columnCount) { col ->
+            @Composable {
+                if (col < cellElements.size) {
+                    HtmlStyledElement(element = cellElements[col]) {
+                        HtmlInlineGroup(
+                            nodes = cellElements[col].childNodes(),
+                            onClickCitation = onClickCitation,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    DataTable(
+        headers = headers,
+        rows = rows,
+        modifier = Modifier.padding(vertical = 8.dp),
+        columnMinWidths = List(columnCount) { 80.dp },
+        columnMaxWidths = List(columnCount) { 200.dp },
+    )
+}
+
+@Composable
 private fun HtmlDetails(element: Element, onClickCitation: (String) -> Unit) {
     val summaryElement = element.children().find { it.tagName().lowercase() == "summary" }
     val summaryText = summaryElement?.text() ?: "Details"
@@ -1226,44 +1424,6 @@ private fun parseFontSize(
 
         normalized.endsWith("%") -> normalized.removeSuffix("%").trim().toFloatOrNull()?.let {
             scaleBase(it / 100f)
-        }
-
-        else -> normalized.toFloatOrNull()?.let {
-            with(density) { it.toSp() }
-        }
-    }
-}
-
-private fun parseSpacing(
-    spacing: String,
-    density: Density,
-    baseFontSize: TextUnit,
-): TextUnit? {
-    val normalized = spacing.trim().lowercase()
-    if (normalized.isEmpty()) return null
-
-    return when {
-        normalized.endsWith("sp") -> normalized.removeSuffix("sp").trim().toFloatOrNull()?.sp
-        normalized.endsWith("px") -> normalized.removeSuffix("px").trim().toFloatOrNull()?.let {
-            with(density) { it.toSp() }
-        }
-
-        normalized.endsWith("em") -> normalized.removeSuffix("em").trim().toFloatOrNull()?.em
-        normalized.endsWith("rem") -> normalized.removeSuffix("rem").trim().toFloatOrNull()?.let {
-            if (baseFontSize.isSpecified && baseFontSize.type == TextUnitType.Sp) {
-                (baseFontSize.value * it).sp
-            } else {
-                16.sp * it
-            }
-        }
-
-        normalized.endsWith("%") -> normalized.removeSuffix("%").trim().toFloatOrNull()?.let {
-            if (!baseFontSize.isSpecified) return@let null
-            when (baseFontSize.type) {
-                TextUnitType.Sp -> (baseFontSize.value * it / 100f).sp
-                TextUnitType.Em -> (baseFontSize.value * it / 100f).em
-                else -> null
-            }
         }
 
         else -> normalized.toFloatOrNull()?.let {
