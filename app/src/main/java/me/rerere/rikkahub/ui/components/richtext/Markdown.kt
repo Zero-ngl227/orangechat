@@ -108,6 +108,14 @@ private val BLOCK_LATEX_REGEX = Regex("\\\\\\[(.+?)\\\\\\]", RegexOption.DOT_MAT
 val THINKING_REGEX = Regex("<think>([\\s\\S]*?)(?:</think>|$)", RegexOption.DOT_MATCHES_ALL)
 private val CODE_BLOCK_REGEX = Regex("```[\\s\\S]*?```|`[^`\n]*`", RegexOption.DOT_MATCHES_ALL)
 private val BREAK_LINE_REGEX = Regex("(?i)<br\\s*/?>")
+private val BREAK_LINE_REGEX = Regex("(?i)<br\\s*/?>")
+// 匹配中文双引号 “...”、「...」 以及英文双引号 "..."
+private val QUOTE_REGEX = Regex("(“[^”]*”|「[^」]*」|\"[^\"\n]*\")")
+
+// 配色定义：引号用温柔棕褐/珊瑚色，斜体心声用藕荷紫，加粗用深梅子红
+private val QuoteHighlightColor = Color(0xFF9C5B49)   // 引号内对白颜色（可随你喜好微调）
+private val ItalicThoughtColor = Color(0xFF8C6278)    // *心声*斜体颜色
+private val StrongHighlightColor = Color(0xFF8F3D58)  // **加粗**重点颜色
 
 // 预处理markdown内容
 private fun preProcess(content: String): String {
