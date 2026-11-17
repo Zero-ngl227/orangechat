@@ -569,7 +569,12 @@ private fun MessagePartsBlock(
                                     // 分气泡: 按模型自己写的换行 (\n) 拆成多个独立气泡,
                                     // 拆分逻辑见 splitIntoBubbleSegments (会保护代码块/表格内部的换行)
                                     val bubbleSegments = remember(displayText) {
-                                        displayText.splitIntoBubbleSegments()
+    try {
+        displayText.splitIntoBubbleSegments()
+    } catch (e: Throwable) {
+        listOf(displayText)
+    }
+                                    }
                                     }
                                     Column(
                                         verticalArrangement = Arrangement.spacedBy(4.dp),
