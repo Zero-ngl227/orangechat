@@ -516,7 +516,11 @@ private fun MessagePartsBlock(
                                         // 分气泡: 按用户输入的换行 (\n) 拆成多个独立气泡,
                                         // 拆分逻辑见 splitIntoBubbleSegments (会保护代码块/表格内部的换行)
                                         val bubbleSegments = remember(displayText) {
-                                            displayText.splitIntoBubbleSegments()
+                                            try {
+                                                displayText.splitIntoBubbleSegments()
+                                            } catch (e: Throwable) {
+                                                listOf(displayText)
+                                            }
                                         }
                                         Column(
                                             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -568,13 +572,12 @@ private fun MessagePartsBlock(
                                 } else if (assistant?.splitBubbleByLine == true) {
                                     // 分气泡: 按模型自己写的换行 (\n) 拆成多个独立气泡,
                                     // 拆分逻辑见 splitIntoBubbleSegments (会保护代码块/表格内部的换行)
-                                    val bubbleSegments = remember(displayText) {
-    try {
-        displayText.splitIntoBubbleSegments()
-    } catch (e: Throwable) {
-        listOf(displayText)
-    }
-                                    }
+                                                                        val bubbleSegments = remember(displayText) {
+                                        try {
+                                            displayText.splitIntoBubbleSegments()
+                                        } catch (e: Throwable) {
+                                            listOf(displayText)
+                                        }
                                     }
                                     Column(
                                         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -615,7 +618,13 @@ private fun MessagePartsBlock(
                                         }
                                     }
                                 } else {
-                                    if (displaySettings.showAssistantBubble) {
+                        val bubbleSegments = remember(displayText) {
+                                            displayText.splitIntoBubbleSegments()
+                                        }
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                                            horizontalAlignment = Alignment.End,
+                                        ) {            if (displaySettings.showAssistantBubble) {
                                         BubbleSurface(
                                             imagePath = displaySettings.assistantBubbleImagePath,
                                             cornerRadius = displaySettings.bubbleCornerRadius.dp,
