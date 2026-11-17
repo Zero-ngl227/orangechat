@@ -915,7 +915,7 @@ private fun BubbleSurface(
                 0.10f to Color.White.copy(alpha = 0.14f),
                 0.28f to Color.White.copy(alpha = 0.42f),
                 0.52f to Color.White.copy(alpha = 0.24f),
-                0.78f to Color.White.alpha(0.08f),
+                0.78f to Color.White.copy(alpha = 0.08f),
                 1f to Color.Transparent,
             ),
             start = Offset.Zero,
